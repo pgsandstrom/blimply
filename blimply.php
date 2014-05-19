@@ -53,6 +53,8 @@ class Blimply {
 		add_action( 'wp_dashboard_setup', array( $this, 'dashboard_setup' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'register_scripts_and_styles' ) );
 		add_action( 'wp_ajax_blimply-send-push', array( $this, 'handle_ajax_post' ) );
+//        add_action( 'draft_to_publish', array( $this, 'action_publish' ));
+        add_action( 'future_to_publish', array( $this, 'action_setup_and_publish' ));
 	}
 
 	function dashboard_setup() {
@@ -83,8 +85,9 @@ class Blimply {
 	function action_admin_init() {
 		global $pagenow;
 		// Init the plugin only on proper pages and if doing ajax request
-		if ( ! in_array( $pagenow, array( 'post-new.php', 'post.php', 'index.php', 'options.php' ) ) && ! defined( 'DOING_AJAX' ) )
-			return;
+        //TODO this is always initialized so it exists when publishing future posts. Send in $force-parameter instead
+//		if ( ! in_array( $pagenow, array( 'post-new.php', 'post.php', 'index.php', 'options.php' ) ) && ! defined( 'DOING_AJAX' ) )
+//			return;
 		$defaults = array(
 			BLIMPLY_PREFIX  . '_name' => '',
 			BLIMPLY_PREFIX  . '_app_key' => '',
@@ -180,15 +183,35 @@ class Blimply {
 			return;
 		if ( !current_user_can( apply_filters( 'blimply_push_cap', 'edit_posts' ) ) )
 			return;
-		if ( 1 == get_post_meta( $post_id, 'blimply_push_sent', true ) )
-			return;
 
 		if ( isset( $_POST['blimply_push'] ) && 1 == $_POST['blimply_push'] ) {
 			$alert = !empty( $_POST['blimply_push_alert'] ) ? sanitize_text_field( $_POST['blimply_push_alert'] ) : sanitize_text_field( $_POST['post_title'] );
-			$this->_send_broadcast_or_push( $alert, $_POST['blimply_push_tag'], get_permalink( $post_id ), (bool) isset( $_POST['blimply_no_sound'] ) && $_POST['blimply_no_sound'] );
-			update_post_meta( $post_id, 'blimply_push_sent', true );
+
+            update_post_meta( $post_id, 'blimply_push_text', $alert );
+            update_post_meta( $post_id, 'blimply_push_tag', $_POST['blimply_push_tag'] );
+            update_post_meta($post_id, 'blimply_push_no_sound', (isset($_POST['blimply_no_sound']) && $_POST['blimply_no_sound']) ? "true" : "false");
 		}
+
+        if (get_post_status($post_id) == 'publish') {
+            $post = get_post($post_id);
+            $this->action_publish($post);
+        }
 	}
+
+    function action_setup_and_publish($post) {
+        $this->action_admin_init();
+        $this->action_publish($post);
+    }
+
+    function action_publish($post) {    //TODO rename function
+        $is_push_sent = get_post_meta($post->ID, 'blimply_push_sent', true);
+        if (1 != $is_push_sent) {
+            update_post_meta($post->ID, 'blimply_push_sent', true);
+            $text = get_post_meta($post->ID, 'blimply_push_text', true);
+            //TODO fix the sound thingy
+            $this->_send_broadcast_or_push($text, 'broadcast', null, false);
+        }
+    }
 
 	/**
 	 * Method to handle AJAX request for Dashboard Widget
@@ -235,7 +258,7 @@ class Blimply {
 			$payload['android']['extra']['url'] = $url;
 		}
 
-		if ( $tag === 'broadcast' ) {
+        if ( $tag === 'broadcast' ) {
 			$response =  $this->request( $this->airship, 'broadcast', $payload );
 		} else {
 			// Set a sound for the specific tag
