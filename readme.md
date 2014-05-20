@@ -6,9 +6,13 @@
 
 Blimply is a plugin that will allow you to send push notifications to your mobile users utilizing Urban Airship API. [Urban Airship](http://urbanairship.com/) account in order to be able to use this plugin. The plugin features the ability to make a push for posts/pages/custom post types, and a handy Dashboard widget.
 
+##Fork Description
+
+I have added some fugly code to make sure pushes happen when the post is published, even if it was a scheduled publishing.
+
 ##  Initial installation
 
-1. `git clone https://github.com/rinatkhaziev/blimply.git` in your WP plugins directory
+1. `git clone https://github.com/pgsandstrom/blimply.git` in your WP plugins directory
 1. `git submodule update --init --recursive` in the plugin dir to get dependencies
 1. Activate the plugin
 1. Set the settings
